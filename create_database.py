@@ -1,8 +1,8 @@
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores.chroma import Chroma 
-from langchain.embeddings import HuggingFaceInferenceAPIEmbeddings
-from secret_key import hugging_face_api_key
+from langchain.embeddings import HuggingFaceInferenceAPIEmbeddings,OpenAIEmbeddings
+from secret_key import hugging_face_api_key,openai_api_key
 import os
 import shutil
 
@@ -32,7 +32,7 @@ def split_text(document):
     chunks = text_splitter.split_documents(document)
     # print(f"Split {len(document)} documents into {len(chunks)} chunks.")
 
-    document = chunks[10]
+    # document = chunks[10]
     # print(document.page_content)
     # print(document.metadata)
 
@@ -45,7 +45,7 @@ def save_to_chroma(chunks):
 
     #create a new db from doc
     db = Chroma.from_documents(
-        chunks, HuggingFaceInferenceAPIEmbeddings(api_key=hugging_face_api_key,model_name='sentence-transformers/all-MiniLM-l6-v2'), persist_directory=CHROMA_PATH
+        chunks, OpenAIEmbeddings(api_key=openai_api_key), persist_directory=CHROMA_PATH
     )
     db.persist()
     print(f"Saved {len(chunks)} to {CHROMA_PATH}")

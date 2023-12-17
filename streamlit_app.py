@@ -1,9 +1,9 @@
 import streamlit as st 
 import create_database
-from secret_key import hugging_face_api_key
-from langchain.embeddings import HuggingFaceInferenceAPIEmbeddings
+from secret_key import hugging_face_api_key,openai_api_key
+from langchain.embeddings import HuggingFaceInferenceAPIEmbeddings,OpenAIEmbeddings
 from langchain.vectorstores.chroma import Chroma
-from langchain.llms import HuggingFaceHub
+from langchain.llms import OpenAI ,HuggingFaceHub 
 from langchain.chains import LLMChain, ConversationChain, ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferWindowMemory
@@ -44,13 +44,11 @@ Question: {question}
 Answer:
 """
 
-llm = HuggingFaceHub(
-    repo_id=REPO_ID, model_kwargs={"temperature": 0.5},huggingfacehub_api_token = hugging_face_api_key
-    )
+llm = OpenAI(temperature=0.7,openai_api_key=openai_api_key)
 
 # prepping the db 
-embedding_function = HuggingFaceInferenceAPIEmbeddings(api_key=hugging_face_api_key)
-db = Chroma(persist_directory=CHROMA_PATH,embedding_function=embedding_function)
+embedding_function =OpenAIEmbeddings(api_key=openai_api_key)
+
 
 
 def main():
@@ -65,14 +63,18 @@ def main():
         st.subheader("This app will help you summarise earning call transcript.")
         pdf_file = st.file_uploader("Upload your earnings call transcript here and click on 'process'",type=['pdf'])
         button = st.button("Process")
+        
 
-        if button:
-            # file_path = os.path.join("tempdir",pdf_file.name)
-            # with open(file_path,"wb") as f:
-            #     f.write(pdf_file.getbuffer())
-    
-            # create_database.generate_data_store(pdf_file=file_path)
-
+        if 'reply' in st.session_state :
+            reply = st.session_state.reply
+            st.write(reply) 
+        elif button:
+            file_path = os.path.join("tempdir",pdf_file.name)
+            with open(file_path,"wb") as f:
+                f.write(pdf_file.getbuffer())
+            create_database.generate_data_store(pdf_file=file_path)
+            
+            db = Chroma(persist_directory=CHROMA_PATH,embedding_function=embedding_function)
             query_metadata = "Company name, financial quarter earnings call, conference call date, number of pages in transcript, company management info."
 
             # search db for relevant context chunks
@@ -86,7 +88,12 @@ def main():
 
             bot_reply = llm_chain.run(context=context_text)
 
-            st.write(bot_reply)
+            st.write(bot_reply) 
+            st.session_state.reply = bot_reply
+
+
+        
+            
 
     # summarise opening remarks before the QnA in the transcript.
     if selected_page == "Opening Remarks Summary":
@@ -101,6 +108,7 @@ def main():
 
         st.header("Chatbot on transcript content :robot_face: ")
         st.text('You can ask questions to chatbot about the content from the transcript,\nit also remembers previous chat history from the current session.')
+        db = Chroma(persist_directory=CHROMA_PATH,embedding_function=embedding_function)
 
         def initialize_session_state():
 
@@ -135,7 +143,7 @@ def main():
                 st.session_state.chain = ConversationalRetrievalChain.from_llm(
                     llm=llm,
                     chain_type="stuff",
-                    memory = ConversationBufferWindowMemory(llm = llm, memory_key='chat_history',input_key='question',output_key='answer',return_messages=True),
+                    memory = ConversationBufferWindowMemory(llm = llm,k=5, memory_key='chat_history',input_key='question',output_key='answer',return_messages=True),
                     retriever = db.as_retriever(),
                     condense_question_prompt=prompt,
                     return_source_documents =False,
