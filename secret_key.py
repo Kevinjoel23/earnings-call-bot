@@ -1,2 +1,0 @@
-openai_api_key = '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'
-hugging_face_api_key = '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'
